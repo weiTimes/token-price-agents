@@ -2,6 +2,7 @@ import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { ChatBox } from './components/ChatBox';
 import './App.css';
+import { useEffect } from 'react';
 
 function App() {
   return (

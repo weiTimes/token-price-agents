@@ -14,6 +14,7 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
   private preferences: Map<string, NotificationPreference> = new Map();
   private lastPriceData: PriceData | null = null;
+  private lastNotificationTimes: Map<string, number> = new Map();
 
   constructor(private readonly notificationGateway: NotificationGateway) {}
 
@@ -21,8 +22,6 @@ export class NotificationService {
     userId: string,
     condition: PriceCondition,
   ): NotificationPreference {
-    this.logger.debug(`Registering preference for user ${userId}:`, condition);
-
     const preference: NotificationPreference = {
       id: uuidv4(),
       userId,
@@ -32,81 +31,84 @@ export class NotificationService {
     };
 
     this.preferences.set(preference.id, preference);
-    this.logger.debug(`Registered preference with ID ${preference.id}`);
+    this.logger.debug(
+      `Registered preference with ID ${preference.id}:`,
+      condition,
+    );
     return preference;
   }
 
   getPreference(id: string): NotificationPreference | undefined {
-    const preference = this.preferences.get(id);
-    this.logger.debug(`Retrieved preference for ID ${id}:`, preference);
-    return preference;
+    return this.preferences.get(id);
   }
 
   getUserPreferences(userId: string): NotificationPreference[] {
-    const preferences = Array.from(this.preferences.values()).filter(
+    return Array.from(this.preferences.values()).filter(
       (pref) => pref.userId === userId,
     );
-    this.logger.debug(`Retrieved preferences for user ${userId}:`, preferences);
-    return preferences;
   }
 
   @OnEvent('price.new')
   async handlePriceUpdate(priceData: PriceData) {
-    // this.logger.debug('Received new price data:', priceData);
     const previousPriceData = this.lastPriceData;
     this.lastPriceData = priceData;
 
     for (const preference of this.preferences.values()) {
-      //   this.logger.debug(`Checking preference ${preference.id}:`, preference);
+      const currentTime = priceData.timestamp;
+      const lastNotificationTime =
+        this.lastNotificationTimes.get(preference.id) || 0;
+      const { notification } = preference.condition.parameters;
 
+      // 检查是否满足通知频率要求
+      let canNotify = false;
+      if (notification.frequency === 'IMMEDIATE') {
+        canNotify = true;
+      } else if (notification.frequency === 'INTERVAL') {
+        const interval = notification.interval || 1000;
+        const timeSinceLastNotification = currentTime - lastNotificationTime;
+        canNotify = timeSinceLastNotification >= interval;
+      }
+
+      // 只有在满足通知频率要求的情况下才检查条件
       if (
-        this.checkCondition(preference.condition, priceData, previousPriceData)
+        canNotify &&
+        this.checkConditions(preference.condition, priceData, previousPriceData)
       ) {
-        this.logger.debug(
-          `Condition met for preference ${preference.id}, sending notification`,
-        );
         await this.notify(
           preference.userId,
           preference.condition.description,
           priceData,
         );
+        this.lastNotificationTimes.set(preference.id, currentTime);
       }
     }
   }
 
-  private checkCondition(
+  private checkConditions(
     condition: PriceCondition,
     currentPrice: PriceData,
     previousPrice: PriceData | null,
   ): boolean {
-    // this.logger.debug('Checking condition:', {
-    //   condition,
-    //   currentPrice,
-    //   previousPrice,
-    // });
-
     if (condition.type !== 'PRICE_PATTERN') {
-      this.logger.debug('Invalid condition type:', condition.type);
       return false;
     }
 
     const { conditions, operator } = condition.parameters;
-    if (!Array.isArray(conditions) || !previousPrice) {
-      this.logger.debug('Invalid conditions or no previous price:', {
-        conditions,
-        hasPreviousPrice: !!previousPrice,
-      });
+    if (!Array.isArray(conditions)) {
+      return false;
+    }
+
+    // 如果有需要比较前一个价格的条件，但没有前一个价格数据，则返回 false
+    if (
+      conditions.some((cond) => cond.target === 'PREVIOUS') &&
+      !previousPrice
+    ) {
       return false;
     }
 
     const results = conditions.map((cond) =>
-      this.checkSingleCondition(cond, currentPrice, previousPrice),
+      this.checkSingleCondition(cond, currentPrice, previousPrice!),
     );
-
-    // this.logger.debug('Condition check results:', {
-    //   operator,
-    //   results,
-    // });
 
     return operator === 'AND'
       ? results.every((r) => r)
@@ -118,12 +120,6 @@ export class NotificationService {
     currentPrice: PriceData,
     previousPrice: PriceData,
   ): boolean {
-    // this.logger.debug('Checking single condition:', {
-    //   condition,
-    //   currentPrice,
-    //   previousPrice,
-    // });
-
     const getCurrentValue = (price: PriceData, type: string) => {
       switch (type) {
         case 'OPEN':
@@ -145,19 +141,9 @@ export class NotificationService {
         ? getCurrentValue(previousPrice, condition.type)
         : condition.value || 0;
 
-    const result =
-      condition.comparison === 'HIGHER'
-        ? currentValue > compareValue
-        : currentValue < compareValue;
-
-    // this.logger.debug('Single condition check result:', {
-    //   currentValue,
-    //   compareValue,
-    //   comparison: condition.comparison,
-    //   result,
-    // });
-
-    return result;
+    return condition.comparison === 'HIGHER'
+      ? currentValue > compareValue
+      : currentValue < compareValue;
   }
 
   private async notify(
@@ -167,7 +153,14 @@ export class NotificationService {
   ) {
     const formattedTime = new Date(priceData.timestamp).toLocaleTimeString(
       'zh-CN',
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      },
     );
+
     const message =
       `价格监控提醒 - ${formattedTime}\n` +
       `条件：${description}\n` +
@@ -186,10 +179,7 @@ export class NotificationService {
       low: priceData.low,
     };
 
-    this.logger.debug(message);
-    console.log(message);
-
-    // Send notification through WebSocket
+    this.logger.debug(`Sending notification to user ${userId}:`, message);
     this.notificationGateway.sendNotification(userId, message, data);
   }
 }

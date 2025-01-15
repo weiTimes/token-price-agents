@@ -137,6 +137,7 @@ export class AIService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.post(TEXT_GENERATION_URL, {
           model: 'qwen-turbo',
+          // model: 'qwq-32b-preview',
           messages: [
             {
               role: 'system',

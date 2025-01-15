@@ -5,6 +5,13 @@
   overflow: hidden;
 }
 
+.bubble-text {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
 .App {
   min-height: 100vh;
   display: flex;

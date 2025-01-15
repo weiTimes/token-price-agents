@@ -60,7 +60,7 @@ export class NotificationGateway
       sockets.forEach((socket) => {
         socket.emit('notification', { message, data });
       });
-      this.logger.debug(`Sent notification to user ${userId}`);
+      this.logger.debug(`Sent notification to user ${userId}:`, data);
     } else {
       this.logger.debug(`No connected sockets for user ${userId}`);
     }

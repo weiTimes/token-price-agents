@@ -16,6 +16,7 @@ interface MinuteData {
 export class PriceMonitorService implements OnModuleInit {
   private priceHistory: PriceData[] = [];
   private currentMinuteData: MinuteData | null = null;
+  private lastEmitTime = 0;
   private readonly MAX_HISTORY_SIZE = 1000;
   private readonly logger = new Logger(PriceMonitorService.name);
 
@@ -31,10 +32,6 @@ export class PriceMonitorService implements OnModuleInit {
     eventSource.onmessage = (event) => {
       try {
         const [timestamp, price] = JSON.parse(event.data);
-        // this.logger.debug(
-        //   `Received price data: timestamp=${timestamp}, price=${price}`,
-        // );
-
         this.processPrice(timestamp, price);
       } catch (error) {
         this.logger.error('Failed to parse price data:', error);
@@ -49,6 +46,8 @@ export class PriceMonitorService implements OnModuleInit {
 
   private processPrice(timestamp: number, price: number) {
     const minuteTimestamp = Math.floor(timestamp / 60000) * 60000;
+    const currentSecond = Math.floor(timestamp / 1000);
+    const lastEmitSecond = Math.floor(this.lastEmitTime / 1000);
 
     if (
       !this.currentMinuteData ||
@@ -87,17 +86,20 @@ export class PriceMonitorService implements OnModuleInit {
       this.currentMinuteData.low = Math.min(this.currentMinuteData.low, price);
       this.currentMinuteData.close = price;
 
-      // Emit intermediate updates with current minute data
-      const intermediateData: PriceData = {
-        symbol: 'BTC/USD',
-        timestamp: minuteTimestamp,
-        open: this.currentMinuteData.open,
-        high: this.currentMinuteData.high,
-        low: this.currentMinuteData.low,
-        close: this.currentMinuteData.close,
-        volume: 0,
-      };
-      this.eventEmitter.emit('price.new', intermediateData);
+      // Only emit if we're in a new second
+      if (currentSecond > lastEmitSecond) {
+        const intermediateData: PriceData = {
+          symbol: 'BTC/USD',
+          timestamp: timestamp,
+          open: this.currentMinuteData.open,
+          high: this.currentMinuteData.high,
+          low: this.currentMinuteData.low,
+          close: this.currentMinuteData.close,
+          volume: 0,
+        };
+        this.eventEmitter.emit('price.new', intermediateData);
+        this.lastEmitTime = timestamp;
+      }
     }
   }
 
