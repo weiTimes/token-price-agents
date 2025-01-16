@@ -6,7 +6,7 @@ class WebSocketService {
 
   connect(userId: string) {
     if (!this.socket) {
-      this.socket = io('http://localhost:3000', {
+      this.socket = io('https://token-price-agents.vercel.app', {
         transports: ['websocket'],
         query: { userId },
       });
