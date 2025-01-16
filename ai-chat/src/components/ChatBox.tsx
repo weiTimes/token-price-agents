@@ -43,14 +43,8 @@ const promptItems: PromptProps[] = [
   {
     key: '1',
     icon: <BulbOutlined style={{ color: '#FFD700' }} />,
-    label: '简单价格监控',
+    label: '简单价格监控（默认按秒）',
     description: '当价格高于100时通知我',
-  },
-  {
-    key: '2',
-    icon: <ClockCircleOutlined style={{ color: '#1890FF' }} />,
-    label: '定时价格监控',
-    description: '每分钟通知我，当价格高于105时',
   },
   {
     key: '3',
@@ -58,6 +52,19 @@ const promptItems: PromptProps[] = [
     label: '复杂价格模式',
     description:
       '每秒通知我，当开盘价低于前一价格柱开盘价，且收盘价高于前一价格柱收盘价时',
+  },
+  {
+    key: '4',
+    icon: <LineChartOutlined style={{ color: '#722ED1' }} />,
+    label: '默认时间窗口',
+    description: '在时间窗口内当价格高于100时通知我',
+  },
+  {
+    key: '5',
+    icon: <LineChartOutlined style={{ color: '#722ED1' }} />,
+    label: '自定义时间窗口',
+    description:
+      '在时间窗口[10:00-11:00, 10:01-11:01, 10:02-11:02]内当价格高于100时通知我',
   },
 ];
 
@@ -167,45 +174,60 @@ export const ChatBox: React.FC = () => {
   };
 
   return (
-    <div style={{ marginTop: '20px' }}>
+    <div
+      style={{
+        marginTop: '12px',
+        flex: 1,
+        width: '100%',
+        overflow: 'hidden',
+      }}
+    >
       <Welcome
         icon="https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*s5sNRo5LjfQAAAAAAAAAAAAADgCCAQ/fmt.webp"
         title="代币价格监控助手"
         description="基于自然语言的智能价格监控系统，支持多种监控条件和通知方式，让价格监控更简单、更智能！"
+        style={{ width: '800px', margin: '0 auto' }}
       />
-      <Card style={{ width: 800, margin: '12px auto' }}>
-        <div style={{ height: 600, display: 'flex', flexDirection: 'column' }}>
-          <div
-            style={{ flex: 1, overflow: 'auto', marginBottom: '10px' }}
-            onScroll={handleScroll}
-          >
-            <Bubble.List
-              autoScroll
-              ref={listRef}
-              roles={roles}
-              items={messages.map((msg, index) => ({
-                key: index,
-                role: msg.type,
-                content: <div className="bubble-text">{msg.content}</div>,
-              }))}
-            />
-          </div>
-          <Prompts
-            title="✨ 示例监控条件"
-            items={promptItems}
-            onItemClick={handlePromptClick}
-            style={{ marginBottom: '12px' }}
-          />
-          <Sender
-            loading={loading}
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            placeholder="输入你想监控的价格条件..."
+      <div className="content">
+        <div
+          className="bubble-list"
+          style={{ overflow: 'auto', marginBottom: '10px' }}
+          onScroll={handleScroll}
+        >
+          <Bubble.List
+            autoScroll
+            ref={listRef}
+            roles={roles}
+            items={messages.map((msg, index) => ({
+              key: index,
+              role: msg.type,
+              content: <div className="bubble-text">{msg.content}</div>,
+            }))}
           />
         </div>
-      </Card>
+        <Prompts
+          wrap
+          title="✨ 示例监控条件"
+          items={promptItems}
+          onItemClick={handlePromptClick}
+          style={{ marginBottom: '12px', flexShrink: 0 }}
+          styles={{
+            item: {
+              flex: 'none',
+              width: 'calc(33% - 6px)',
+            },
+          }}
+        />
+        <Sender
+          loading={loading}
+          value={inputValue}
+          onChange={setInputValue}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          placeholder="输入你想监控的价格条件..."
+          style={{ flexShrink: 0 }}
+        />
+      </div>
     </div>
   );
 };

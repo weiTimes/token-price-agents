@@ -20,6 +20,27 @@
   overflow: hidden;
 }
 
+.content {
+  height: calc(100vh - 120px);
+  overflow: hidden;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 15px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bubble-list {
+  flex: 1;
+  overflow: auto;
+  margin-bottom: 10px;
+}
+
 /* 自定义滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;

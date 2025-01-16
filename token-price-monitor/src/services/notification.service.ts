@@ -4,6 +4,8 @@ import {
   PriceData,
   NotificationPreference,
   PriceCondition,
+  TimeWindow,
+  WindowState,
 } from '../interfaces/price.interface';
 import { PriceComparisonCondition } from '../interfaces/intent.interface';
 import { NotificationGateway } from '../gateways/notification.gateway';
@@ -15,8 +17,64 @@ export class NotificationService {
   private preferences: Map<string, NotificationPreference> = new Map();
   private lastPriceData: PriceData | null = null;
   private lastNotificationTimes: Map<string, number> = new Map();
+  private timeWindowEnabled: Map<string, boolean> = new Map(); // 每个偏好的时间窗口开关
+  private timeWindows: Map<string, TimeWindow[]> = new Map(); // 每个偏好的时间窗口配置
 
   constructor(private readonly notificationGateway: NotificationGateway) {}
+
+  private createDefaultTimeWindows(baseTime: Date = new Date()): TimeWindow[] {
+    // 格式化时间为 HH:mm 格式
+    const formatTime = (date: Date) => {
+      return date.toTimeString().substring(0, 5);
+    };
+
+    // 创建三个时间窗口，分别在当前时间后推1、2、3分钟开始，每个持续1小时
+    return [
+      {
+        startTime: formatTime(new Date(baseTime.getTime() + 60000)), // +1分钟
+        endTime: formatTime(new Date(baseTime.getTime() + 3660000)), // +1分钟+1小时
+        prices: [],
+      },
+      {
+        startTime: formatTime(new Date(baseTime.getTime() + 120000)), // +2分钟
+        endTime: formatTime(new Date(baseTime.getTime() + 3720000)), // +2分钟+1小时
+        prices: [],
+      },
+      {
+        startTime: formatTime(new Date(baseTime.getTime() + 180000)), // +3分钟
+        endTime: formatTime(new Date(baseTime.getTime() + 3780000)), // +3分钟+1小时
+        prices: [],
+      },
+    ];
+  }
+
+  private parseCustomTimeWindows(description: string): TimeWindow[] | null {
+    // 匹配时间窗口格式 [HH:mm-HH:mm, HH:mm-HH:mm, HH:mm-HH:mm]
+    const timeWindowMatch = description.match(/时间窗口\[([\d:,-\s]+)\]/);
+    if (!timeWindowMatch) return null;
+
+    const timeWindowsStr = timeWindowMatch[1];
+    const windowStrings = timeWindowsStr.split(',').map((s) => s.trim());
+
+    // 验证是否有正确数量的时间窗口
+    if (windowStrings.length !== 3) return null;
+
+    const windows: TimeWindow[] = [];
+    for (const windowStr of windowStrings) {
+      const [start, end] = windowStr.split('-').map((s) => s.trim());
+      // 验证时间格式
+      if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end))
+        return null;
+
+      windows.push({
+        startTime: start,
+        endTime: end,
+        prices: [],
+      });
+    }
+
+    return windows;
+  }
 
   registerPreference(
     userId: string,
@@ -30,11 +88,33 @@ export class NotificationService {
       updatedAt: new Date(),
     };
 
+    // 检查意图中是否包含时间窗口相关的关键词
+    const hasTimeWindowKeywords =
+      condition.description.includes('时间窗口') ||
+      condition.description.includes('重叠区域') ||
+      condition.description.includes('时间段');
+
+    // 设置时间窗口开关
+    this.timeWindowEnabled.set(preference.id, hasTimeWindowKeywords);
+
+    if (hasTimeWindowKeywords) {
+      // 尝试解析自定义时间窗口
+      const customWindows = this.parseCustomTimeWindows(condition.description);
+
+      // 如果有自定义时间窗口，使用自定义的；否则使用默认的
+      const windows = customWindows || this.createDefaultTimeWindows();
+      this.timeWindows.set(preference.id, windows);
+
+      // 在响应中添加时间窗口信息
+      const timeWindowInfo = windows
+        .map((w) => `- ${w.startTime} - ${w.endTime}`)
+        .join('\n');
+
+      // 更新条件描述，包含时间窗口信息
+      condition.description = `${condition.description}\n\n已启用时间窗口监控，时间窗口设置为：\n${timeWindowInfo}`;
+    }
+
     this.preferences.set(preference.id, preference);
-    this.logger.debug(
-      `Registered preference with ID ${preference.id}:`,
-      condition,
-    );
     return preference;
   }
 
@@ -48,15 +128,27 @@ export class NotificationService {
     );
   }
 
+  private isInOverlappingPeriod(
+    timestamp: number,
+    windows: TimeWindow[],
+  ): boolean {
+    const timeStr = new Date(timestamp).toTimeString().substring(0, 5);
+    // 检查当前时间是否在所有时间窗口内
+    return windows.every(
+      (window) => timeStr >= window.startTime && timeStr <= window.endTime,
+    );
+  }
+
   @OnEvent('price.new')
   async handlePriceUpdate(priceData: PriceData) {
+    this.logger.debug(`Handling price update: ${JSON.stringify(priceData)}`);
     const previousPriceData = this.lastPriceData;
     this.lastPriceData = priceData;
 
-    for (const preference of this.preferences.values()) {
+    // 检查每个偏好设置
+    for (const [id, preference] of this.preferences.entries()) {
       const currentTime = priceData.timestamp;
-      const lastNotificationTime =
-        this.lastNotificationTimes.get(preference.id) || 0;
+      const lastNotificationTime = this.lastNotificationTimes.get(id) || 0;
       const { notification } = preference.condition.parameters;
 
       // 检查是否满足通知频率要求
@@ -69,17 +161,26 @@ export class NotificationService {
         canNotify = timeSinceLastNotification >= interval;
       }
 
-      // 只有在满足通知频率要求的情况下才检查条件
+      if (!canNotify) continue;
+
+      // 检查是否启用了时间窗口
+      if (this.timeWindowEnabled.get(id)) {
+        const windows = this.timeWindows.get(id);
+        // 只在所有时间窗口重叠时才继续检查
+        if (!this.isInOverlappingPeriod(priceData.timestamp, windows)) {
+          this.logger.debug('Price update is outside overlapping period');
+          continue;
+        }
+      }
+
+      // 检查价格条件
       if (
-        canNotify &&
         this.checkConditions(preference.condition, priceData, previousPriceData)
       ) {
-        await this.notify(
-          preference.userId,
-          preference.condition.description,
-          priceData,
-        );
-        this.lastNotificationTimes.set(preference.id, currentTime);
+        // 获取原始的条件描述（不包含时间窗口信息）
+        const description = preference.condition.description.split('\n\n')[0];
+        await this.notify(preference.userId, description, priceData);
+        this.lastNotificationTimes.set(id, currentTime);
       }
     }
   }
