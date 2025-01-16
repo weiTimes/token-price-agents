@@ -1,4 +1,4 @@
-import { Controller, Sse, MessageEvent } from '@nestjs/common';
+import { Controller, Sse, MessageEvent, Get } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
 import { AppService } from './app.service';
 import { PriceTuple } from './stock-simulator.interface';
@@ -6,6 +6,11 @@ import { PriceTuple } from './stock-simulator.interface';
 @Controller('stocks')
 export class AppController {
   constructor(private readonly stocksService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.stocksService.getHello();
+  }
 
   /**
    * SSE endpoint: /stocks/prices

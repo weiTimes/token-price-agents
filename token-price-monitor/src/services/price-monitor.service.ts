@@ -27,7 +27,10 @@ export class PriceMonitorService implements OnModuleInit {
   }
 
   private connectToPriceStream() {
-    const eventSource = new EventSource('http://localhost:3001/stocks/prices');
+    // const eventSource = new EventSource('http://localhost:3001/stocks/prices');
+    const eventSource = new EventSource(
+      'https://token-price-agents.vercel.app/stocks/prices',
+    );
 
     eventSource.onmessage = (event) => {
       try {

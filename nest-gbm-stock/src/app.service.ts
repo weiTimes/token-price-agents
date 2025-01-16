@@ -9,6 +9,10 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {}
 
+  getHello(): string {
+    return 'Hello World!';
+  }
+
   /**
    * Lifecycle hook that runs once this service is initialized.
    * Starts the background price simulation.
@@ -63,7 +67,8 @@ export class AppService implements OnModuleInit, OnModuleDestroy {
         const randomStdNormal = this.generateStandardNormal();
 
         // GBM-like price change
-        const deltaPrice = currentPrice * (drift + volatility * randomStdNormal);
+        const deltaPrice =
+          currentPrice * (drift + volatility * randomStdNormal);
         currentPrice = Math.max(currentPrice + deltaPrice, 0.01);
 
         // Emit a tuple [timestamp, price]
