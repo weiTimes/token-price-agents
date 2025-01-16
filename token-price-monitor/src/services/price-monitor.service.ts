@@ -32,13 +32,15 @@ export class PriceMonitorService implements OnModuleInit {
 
   private connectToPriceStream() {
     const baseUrl = this.configService.get<string>('priceStream.url');
+    const priceStreamUrl = `${baseUrl}/stocks/prices`;
 
-    console.log(baseUrl, 'baseUrl-----------------');
+    this.logger.log(`Connecting to price stream at ${priceStreamUrl}`);
 
-    const eventSource = new EventSource(`${baseUrl}/stocks/prices`);
-    // const eventSource = new EventSource(
-    //   'https://nest-gbm-stock.vercel.app/stocks/prices',
-    // );
+    const eventSource = new EventSource(priceStreamUrl);
+
+    eventSource.onopen = () => {
+      this.logger.log('Price stream connection established');
+    };
 
     eventSource.onmessage = (event) => {
       try {
@@ -50,10 +52,10 @@ export class PriceMonitorService implements OnModuleInit {
     };
 
     eventSource.onerror = (error) => {
-      this.logger.error(
-        'Price stream connection error:',
-        JSON.stringify(error),
-      );
+      this.logger.error('Price stream connection error:', error);
+      // 关闭当前连接
+      eventSource.close();
+      // 5秒后重试
       setTimeout(() => this.connectToPriceStream(), 5000);
     };
   }

@@ -48,7 +48,7 @@ npm install
 npm run dev
 ```
 
-应用将在 http://localhost:5173 启动，提供以下功能：
+应用将在 http://localhost:5173 启动（会自动打开浏览器），提供以下功能：
 
 - 聊天式界面
 - 自然语言价格监控配置
