@@ -205,7 +205,6 @@ export const ChatBox: React.FC = () => {
           />
         </div>
         <Prompts
-          wrap
           title="✨ 示例监控条件"
           items={promptItems}
           onItemClick={handlePromptClick}
@@ -213,7 +212,7 @@ export const ChatBox: React.FC = () => {
           styles={{
             item: {
               flex: 'none',
-              width: 'calc(33% - 6px)',
+              width: 'calc(38% - 20px)',
             },
           }}
         />
