@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { config } from '../config';
 
 class WebSocketService {
   private socket: Socket | null = null;
@@ -6,7 +7,7 @@ class WebSocketService {
 
   connect(userId: string) {
     if (!this.socket) {
-      this.socket = io('https://token-price-agents.vercel.app', {
+      this.socket = io(config.apiBaseUrl, {
         transports: ['websocket'],
         query: { userId },
       });

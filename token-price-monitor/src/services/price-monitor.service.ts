@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PriceData } from '../interfaces/price.interface';
 import { EventSource } from 'eventsource';
+import { ConfigService } from '@nestjs/config';
 
 interface MinuteData {
   prices: number[];
@@ -20,17 +21,24 @@ export class PriceMonitorService implements OnModuleInit {
   private readonly MAX_HISTORY_SIZE = 1000;
   private readonly logger = new Logger(PriceMonitorService.name);
 
-  constructor(private eventEmitter: EventEmitter2) {}
+  constructor(
+    private eventEmitter: EventEmitter2,
+    private configService: ConfigService,
+  ) {}
 
   onModuleInit() {
     this.connectToPriceStream();
   }
 
   private connectToPriceStream() {
-    // const eventSource = new EventSource('http://localhost:3001/stocks/prices');
-    const eventSource = new EventSource(
-      'https://nest-gbm-stock.vercel.app/stocks/prices',
-    );
+    const baseUrl = this.configService.get<string>('priceStream.url');
+
+    console.log(baseUrl, 'baseUrl-----------------');
+
+    const eventSource = new EventSource(`${baseUrl}/stocks/prices`);
+    // const eventSource = new EventSource(
+    //   'https://nest-gbm-stock.vercel.app/stocks/prices',
+    // );
 
     eventSource.onmessage = (event) => {
       try {
