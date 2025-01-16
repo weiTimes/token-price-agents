@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Card, message } from 'antd';
+import { message } from 'antd';
 import {
   RobotOutlined,
   UserOutlined,
   BulbOutlined,
-  ClockCircleOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
 import { Bubble, Welcome, Sender, Prompts } from '@ant-design/x';
