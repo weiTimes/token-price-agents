@@ -10,6 +10,7 @@ import {
 import { PriceComparisonCondition } from '../interfaces/intent.interface';
 import { NotificationGateway } from '../gateways/notification.gateway';
 import { v4 as uuidv4 } from 'uuid';
+import { NotificationQueueService } from './notification-queue.service';
 
 @Injectable()
 export class NotificationService {
@@ -17,10 +18,13 @@ export class NotificationService {
   private preferences: Map<string, NotificationPreference> = new Map();
   private lastPriceData: PriceData | null = null;
   private lastNotificationTimes: Map<string, number> = new Map();
-  private timeWindowEnabled: Map<string, boolean> = new Map(); // 每个偏好的时间窗口开关
-  private timeWindows: Map<string, TimeWindow[]> = new Map(); // 每个偏好的时间窗口配置
+  private timeWindowEnabled: Map<string, boolean> = new Map();
+  private timeWindows: Map<string, TimeWindow[]> = new Map();
 
-  constructor(private readonly notificationGateway: NotificationGateway) {}
+  constructor(
+    private readonly notificationGateway: NotificationGateway,
+    private readonly notificationQueue: NotificationQueueService,
+  ) {}
 
   private createDefaultTimeWindows(baseTime: Date = new Date()): TimeWindow[] {
     // 格式化时间为 HH:mm 格式
@@ -145,6 +149,9 @@ export class NotificationService {
     const previousPriceData = this.lastPriceData;
     this.lastPriceData = priceData;
 
+    // 收集需要发送的通知
+    const notifications: { userId: string; message: string }[] = [];
+
     // 检查每个偏好设置
     for (const [id, preference] of this.preferences.entries()) {
       const currentTime = priceData.timestamp;
@@ -166,7 +173,6 @@ export class NotificationService {
       // 检查是否启用了时间窗口
       if (this.timeWindowEnabled.get(id)) {
         const windows = this.timeWindows.get(id);
-        // 只在所有时间窗口重叠时才继续检查
         if (!this.isInOverlappingPeriod(priceData.timestamp, windows)) {
           this.logger.debug('Price update is outside overlapping period');
           continue;
@@ -177,11 +183,28 @@ export class NotificationService {
       if (
         this.checkConditions(preference.condition, priceData, previousPriceData)
       ) {
-        // 获取原始的条件描述（不包含时间窗口信息）
         const description = preference.condition.description.split('\n\n')[0];
-        await this.notify(preference.userId, description, priceData);
+        const message =
+          `价格监控提醒 - ${new Date(priceData.timestamp).toLocaleTimeString()}\n` +
+          `条件：${description}\n` +
+          `当前价格数据：\n` +
+          `- 开盘价：${priceData.open}\n` +
+          `- 最高价：${priceData.high}\n` +
+          `- 最低价：${priceData.low}\n` +
+          `- 收盘价：${priceData.close}`;
+
+        notifications.push({
+          userId: preference.userId,
+          message,
+        });
+
         this.lastNotificationTimes.set(id, currentTime);
       }
+    }
+
+    // 批量添加通知到队列
+    if (notifications.length > 0) {
+      await this.notificationQueue.addBatch(notifications);
     }
   }
 
@@ -252,35 +275,16 @@ export class NotificationService {
     description: string,
     priceData: PriceData,
   ) {
-    const formattedTime = new Date(priceData.timestamp).toLocaleTimeString(
-      'zh-CN',
-      {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      },
-    );
-
     const message =
-      `价格监控提醒 - ${formattedTime}\n` +
+      `价格监控提醒 - ${new Date(priceData.timestamp).toLocaleTimeString()}\n` +
       `条件：${description}\n` +
       `当前价格数据：\n` +
-      `- 开盘价：${priceData.open.toFixed(2)}\n` +
-      `- 最高价：${priceData.high.toFixed(2)}\n` +
-      `- 最低价：${priceData.low.toFixed(2)}\n` +
-      `- 收盘价：${priceData.close.toFixed(2)}`;
+      `- 开盘价：${priceData.open}\n` +
+      `- 最高价：${priceData.high}\n` +
+      `- 最低价：${priceData.low}\n` +
+      `- 收盘价：${priceData.close}`;
 
-    const data = {
-      symbol: priceData.symbol,
-      timestamp: formattedTime,
-      open: priceData.open,
-      close: priceData.close,
-      high: priceData.high,
-      low: priceData.low,
-    };
-
-    this.logger.debug(`Sending notification to user ${userId}:`, message);
-    this.notificationGateway.sendNotification(userId, message, data);
+    // 将通知添加到队列而不是直接发送
+    await this.notificationQueue.addNotification(userId, message);
   }
 }

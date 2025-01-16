@@ -11,6 +11,7 @@ import { NotificationController } from './controllers/notification.controller';
 import { IntentController } from './controllers/intent.controller';
 import { NotificationGateway } from './gateways/notification.gateway';
 import configuration from './config/configuration';
+import { NotificationQueueService } from './services/notification-queue.service';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import configuration from './config/configuration';
     IntentParserService,
     AIService,
     NotificationGateway,
+    NotificationQueueService,
   ],
 })
 export class AppModule {}
