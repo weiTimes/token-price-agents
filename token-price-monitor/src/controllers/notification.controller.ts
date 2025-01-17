@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Sse } from '@nestjs/common';
 import { NotificationService } from '../services/notification.service';
 import {
   CreateNotificationPreferenceDto,

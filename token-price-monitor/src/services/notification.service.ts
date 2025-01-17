@@ -5,7 +5,6 @@ import {
   NotificationPreference,
   PriceCondition,
   TimeWindow,
-  WindowState,
 } from '../interfaces/price.interface';
 import { PriceComparisonCondition } from '../interfaces/intent.interface';
 import { NotificationGateway } from '../gateways/notification.gateway';

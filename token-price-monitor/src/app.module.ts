@@ -12,6 +12,7 @@ import { IntentController } from './controllers/intent.controller';
 import { NotificationGateway } from './gateways/notification.gateway';
 import configuration from './config/configuration';
 import { NotificationQueueService } from './services/notification-queue.service';
+import { MessageController } from './controllers/message.controller';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { NotificationQueueService } from './services/notification-queue.service'
     ScheduleModule.forRoot(),
     HttpModule,
   ],
-  controllers: [NotificationController, IntentController],
+  controllers: [NotificationController, IntentController, MessageController],
   providers: [
     PriceMonitorService,
     NotificationService,

@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { NotificationGateway } from '../gateways/notification.gateway';
+import { Observable, Subject } from 'rxjs';
 
 interface QueuedNotification {
   userId: string;
@@ -10,14 +11,33 @@ interface QueuedNotification {
 }
 
 @Injectable()
-export class NotificationQueueService {
+export class NotificationQueueService implements OnModuleInit {
   private readonly logger = new Logger(NotificationQueueService.name);
   private queue: QueuedNotification[] = [];
   private readonly maxRetries = 3;
   private readonly batchSize = 100;
   private readonly maxQueueSize = 10000;
+  private messageSubject = new Subject<any>();
 
   constructor(private readonly notificationGateway: NotificationGateway) {}
+
+  /**
+   * Lifecycle hook that runs once this service is initialized.
+   * Starts the background price simulation.
+   */
+  onModuleInit() {
+    // setInterval(() => {
+    //   this.messageSubject.next({
+    //     timestamp: new Date().toLocaleTimeString(),
+    //     userId: 'user123',
+    //     message: 'test',
+    //   });
+    // }, 1000);
+  }
+
+  public getMessageStream(): Observable<any> {
+    return this.messageSubject.asObservable();
+  }
 
   async addNotification(userId: string, message: string) {
     if (this.queue.length >= this.maxQueueSize) {
@@ -86,12 +106,21 @@ export class NotificationQueueService {
       `Sending notification to ${notification.userId}: ${notification.message}`,
     );
 
+    const timestamp = new Date(notification.timestamp).toLocaleTimeString();
+
+    // Emit sse message
+    this.messageSubject.next({
+      timestamp,
+      userId: notification.userId,
+      message: notification.message,
+    });
+
     // 使用 NotificationGateway 发送通知
     await this.notificationGateway.sendNotification(
       notification.userId,
       notification.message,
       {
-        timestamp: new Date(notification.timestamp).toLocaleTimeString(),
+        timestamp,
       },
     );
   }

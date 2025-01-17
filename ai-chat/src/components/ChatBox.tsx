@@ -10,7 +10,8 @@ import { Bubble, Welcome, Sender, Prompts } from '@ant-design/x';
 import type { GetProp, GetRef } from 'antd';
 import type { PromptProps } from '@ant-design/x';
 import { createIntent } from '../services/api';
-import { webSocketService } from '../services/websocket';
+// import { webSocketService } from '../services/websocket';
+import { config } from '../config';
 
 interface Message {
   id: string;
@@ -74,6 +75,41 @@ export const ChatBox: React.FC = () => {
   const [userScrolled, setUserScrolled] = useState(false);
   const listRef = useRef<GetRef<typeof Bubble.List>>(null);
 
+  function connectToPriceStream() {
+    const priceStreamUrl = `${config.apiBaseUrl}/message/prices`;
+
+    const eventSource = new EventSource(priceStreamUrl);
+
+    eventSource.onopen = () => {
+      console.log('Message stream connection established');
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        addMessage({
+          type: 'notification',
+          content: data.message,
+        });
+      } catch (error) {
+        console.error('Failed to parse message data:', error);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('Message stream connection error:', error);
+      // 关闭当前连接
+      eventSource.close();
+      // 5秒后重试
+      setTimeout(() => connectToPriceStream(), 5000);
+    };
+  }
+
+  useEffect(() => {
+    connectToPriceStream();
+  }, []);
+
   useEffect(() => {
     // 添加欢迎消息（仅在第一次渲染时添加）
     addMessage({
@@ -81,20 +117,20 @@ export const ChatBox: React.FC = () => {
       content: '你好！我是价格监控助手。你可以点击下方的示例来了解如何使用我。',
     });
 
-    // 连接 WebSocket
-    webSocketService.connect(USER_ID);
+    // // 连接 WebSocket
+    // webSocketService.connect(USER_ID);
 
-    // 监听通知消息
-    const unsubscribe = webSocketService.onMessage((data) => {
-      addMessage({
-        type: 'notification',
-        content: data.message,
-      });
-    });
+    // // 监听通知消息
+    // const unsubscribe = webSocketService.onMessage((data) => {
+    //   addMessage({
+    //     type: 'notification',
+    //     content: data.message,
+    //   });
+    // });
 
     return () => {
-      unsubscribe();
-      webSocketService.disconnect();
+      // unsubscribe();
+      // webSocketService.disconnect();
     };
   }, []);
 
