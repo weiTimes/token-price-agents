@@ -209,12 +209,12 @@ export const ChatBox: React.FC = () => {
           items={promptItems}
           onItemClick={handlePromptClick}
           style={{ marginBottom: '12px', flexShrink: 0 }}
-          styles={{
-            item: {
-              flex: 'none',
-              width: 'calc(38% - 20px)',
-            },
-          }}
+          // styles={{
+          //   item: {
+          //     flex: 'none',
+          //     width: 'calc(38% - 20px)',
+          //   },
+          // }}
         />
         <Sender
           loading={loading}
